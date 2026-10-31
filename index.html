@@ -85,7 +85,7 @@ async function start(){
   const ds=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='audioinput');
   const cur=stream.getAudioTracks()[0].getSettings().deviceId;
   $('dev').innerHTML=ds.map(d=>`<option value="${d.deviceId}" ${d.deviceId===cur?'selected':''}>${d.label||'入力'}</option>`).join('');
-  $('msg').textContent='入力中('+Math.round(ctx.sampleRate)+' Hz)';
+  const tk=stream.getAudioTracks()[0];$('msg').textContent='使用中の入力: '+(tk.label||'(名称なし)')+' / '+Math.round(ctx.sampleRate)+' Hz / 一覧'+ds.length+'件';
   if(!run){run=true;requestAnimationFrame(loop)}
  }catch(e){$('msg').textContent='マイクを開始できません: '+e.message}
 }
