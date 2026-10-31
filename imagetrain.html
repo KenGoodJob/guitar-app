@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>ギター イメトレ</title>
+<style>
+:root{--bg:#f6f5f2;--fg:#1d1d1b;--mut:#6b6a66;--card:#fff;--bd:#cfcdc6;--ok:#1f9d55;--ng:#d64545;--ac:#2f6fed;box-sizing:border-box;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171716;--fg:#ecebe7;--mut:#9a9890;--card:#2a2a28;--bd:#4a4944;--ok:#3ecf7a;--ng:#ff6b6b;--ac:#6c9bff}}
+:root[data-theme="dark"]{--bg:#171716;--fg:#ecebe7;--mut:#9a9890;--card:#2a2a28;--bd:#4a4944;--ok:#3ecf7a;--ng:#ff6b6b;--ac:#6c9bff}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font:14px system-ui,-apple-system,"Hiragino Sans",sans-serif;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;overscroll-behavior:none}
+#app{display:flex;height:100%}
+#rot{display:none;height:100%;align-items:center;justify-content:center;font-size:18px;text-align:center}
+@media(orientation:portrait){#app{display:none}#rot{display:flex}}
+#pick{width:88px;margin:6px;border-radius:14px;border:2px solid var(--ac);background:var(--card);color:var(--ac);font-size:18px;font-weight:700}
+#pick:active{background:var(--ac);color:#fff}
+#main{flex:1;display:flex;flex-direction:column;min-width:0}
+#bar{display:flex;gap:6px;align-items:center;padding:6px 4px;height:36px}
+#cs{display:flex;gap:4px;overflow-x:auto;touch-action:pan-x;flex:1}
+button{font:inherit;color:var(--fg);background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:4px 10px;flex:none}
+button.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+#msg{min-width:6em;font-weight:700;text-align:right}
+#bd{flex:1;position:relative}
+#bar button{padding:4px 8px;font-size:13px}
+.flip #bar button,.flip #msg,.flip #pick,.flip #rot{transform:rotate(180deg)}
+#sv{position:absolute;inset:0;width:100%;height:100%}
+</style></head><body>
+<div id="rot">スマホを横向きにしてください<br>(画面の回転ロックをOFFに)</div>
+<div id="app">
+<button id="pick">ピック</button>
+<div id="main">
+<div id="bar"><div id="cs"></div><button id="rn">ランダム</button><button id="nx">次</button><button id="mm">暗記</button><button id="pk">答え</button><button id="ts">タッチ音</button><button id="fl" class="on">文字反転</button><span id="msg"></span></div>
+<div id="bd"><svg id="sv"></svg></div>
+</div></div>
+<script>
+const $=id=>document.getElementById(id);
+const T=[40,45,50,55,59,64],FC=['','#2f6fed','#1f9d55','#e08a00','#b04bd6'],FN=['','人','中','薬','小'];
+const CH={F:[[1,3,3,2,1,1],[1,3,4,2,1,1]],C:[[-1,3,2,0,1,0],[0,3,2,0,1,0]],G:[[3,2,0,0,0,3],[3,2,0,0,0,4]],Am:[[-1,0,2,2,1,0],[0,0,2,3,1,0]],Em:[[0,2,2,0,0,0],[0,2,3,0,0,0]],D:[[-1,-1,0,2,3,2],[0,0,0,1,3,2]],A:[[-1,0,2,2,2,0],[0,0,1,2,3,0]],E:[[0,2,2,1,0,0],[0,2,3,1,0,0]],Dm:[[-1,-1,0,2,3,1],[0,0,0,2,3,1]],Bm:[[-1,2,4,4,3,2],[0,1,3,4,2,1]],E7:[[0,2,0,1,0,0],[0,2,0,1,0,0]],A7:[[-1,0,2,0,2,0],[0,0,2,0,3,0]],D7:[[-1,-1,0,2,1,2],[0,0,0,2,1,3]]};
+let flip=true,cur='F',mem=false,peek=false,tsnd=false,ctx,bc={},pts=new Map(),pr={},mt;
+$('cs').innerHTML=Object.keys(CH).map(k=>`<button class="c" data-k="${k}">${k}</button>`).join('');
+$('cs').onclick=e=>{const k=e.target.dataset.k;if(k){cur=k;$('msg').textContent='';draw()}};
+$('mm').onclick=()=>{mem=!mem;$('mm').classList.toggle('on',mem);draw()};
+$('ts').onclick=()=>{tsnd=!tsnd;$('ts').classList.toggle('on',tsnd)};
+$('fl').onclick=()=>{flip=!flip;$('fl').classList.toggle('on',flip);document.body.classList.toggle('flip',flip);draw()};
+document.body.classList.add('flip');
+let rnd=false,nt;
+function nextChord(){const k=Object.keys(CH).filter(x=>x!==cur);cur=k[Math.floor(Math.random()*k.length)];$('msg').textContent='';draw()}
+$('rn').onclick=()=>{rnd=!rnd;$('rn').classList.toggle('on',rnd);clearTimeout(nt);if(rnd)nextChord()};
+$('nx').onclick=()=>{clearTimeout(nt);nextChord()};
+$('pk').onpointerdown=()=>{peek=true;draw()};
+$('pk').onpointerup=$('pk').onpointerleave=$('pk').onpointercancel=()=>{if(peek){peek=false;draw()}};
+function geo(){const W=$('bd').clientWidth,H=$('bd').clientHeight,nut=Math.max(36,W*0.07);return{W,H,nut,cw:(W-nut-10)/5,y0:H*0.1,dy:H*0.8/5}}
+function barre(){const[f,fg]=CH[cur],r=[];fg.forEach((x,i)=>{if(x===1)r.push(i)});
+ return r.length>=2&&r.every(i=>f[i]===f[r[0]])?{f:f[r[0]],rows:r,a:r[0],b:r[r.length-1]}:null}
+function cell(p){const g=geo(),i=Math.max(0,Math.min(5,Math.round((p.y-g.y0)/g.dy))),c=Math.floor((g.W-p.x-g.nut)/g.cw)+1;return c>=1&&c<=5?{i,c}:null}
+function calc(){const p={},br=barre();
+ pts.forEach(q=>{const k=cell(q);if(!k)return;
+  if(br&&k.c===br.f&&k.i>=br.a&&k.i<=br.b)br.rows.forEach(r=>{p[r]=k.c});
+  else p[k.i]=Math.max(p[k.i]||0,k.c)});
+ return p}
+function draw(){
+ const g=geo();if(!g.W||!g.H)return;
+ const[f,fg]=CH[cur],br=barre(),R=Math.min(g.cw,g.dy)*0.38,show=!mem||peek,cx=c=>g.W-g.nut-(c-0.5)*g.cw,rt=(x,y)=>flip?` transform="rotate(180 ${x} ${y})"`:'',cy=i=>g.y0+i*g.dy;let o=`<text x="${g.W/2}" y="${g.H/2}"${rt(g.W/2,g.H/2)} text-anchor="middle" dominant-baseline="central" font-size="${g.H*0.55}" font-weight="700" fill="var(--fg)" opacity=".12">${cur}</text>`;
+ for(let i=0;i<6;i++)o+=`<line x1="6" x2="${g.W-g.nut}" y1="${cy(i)}" y2="${cy(i)}" stroke="var(--mut)" stroke-width="${3.4-i*0.45}"/>`;
+ for(let c=0;c<=5;c++){const x=g.W-g.nut-c*g.cw;o+=`<line x1="${x}" x2="${x}" y1="${g.y0-8}" y2="${g.y0+5*g.dy+8}" stroke="${c?'var(--bd)':'var(--fg)'}" stroke-width="${c?2:5}"/>`}
+ f.forEach((t,i)=>{
+  if(t<0)o+=`<text x="${g.W-g.nut+16}" y="${cy(i)+6}"${rt(g.W-g.nut+16,cy(i))} text-anchor="middle" font-size="18" fill="var(--mut)">×</text>`;
+  else if(t===0)o+=`<circle cx="${g.W-g.nut+16}" cy="${cy(i)}" r="6" fill="none" stroke="var(--mut)" stroke-width="2"/>`});
+ if(show){
+  if(br)o+=`<rect x="${cx(br.f)-R}" y="${cy(br.a)-R}" width="${2*R}" height="${(br.b-br.a)*g.dy+2*R}" rx="${R}" fill="${FC[1]}" opacity=".85"/>`;
+  f.forEach((t,i)=>{if(t>0)o+=`<circle cx="${cx(t)}" cy="${cy(i)}" r="${R}" fill="${FC[fg[i]]}"/><text x="${cx(t)}" y="${cy(i)+R*0.38}"${rt(cx(t),cy(i))} text-anchor="middle" font-size="${R*1.1}" fill="#fff">${FN[fg[i]]}</text>`})}
+ Object.keys(pr).forEach(i=>{o+=`<circle cx="${cx(pr[i])}" cy="${cy(+i)}" r="${R+4}" fill="none" stroke="var(--fg)" stroke-width="3"/>`});
+ $('sv').setAttribute('viewBox',`0 0 ${g.W} ${g.H}`);$('sv').innerHTML=o;
+ document.querySelectorAll('.c').forEach(b=>b.classList.toggle('on',b.dataset.k===cur))}
+const bd=$('bd'),pos=e=>{const r=bd.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top}};
+function upd(){pr=calc();draw()}
+bd.onpointerdown=e=>{audio();bd.setPointerCapture(e.pointerId);const p=pos(e);pts.set(e.pointerId,p);upd();
+ if(tsnd){const k=cell(p);if(k)play(T[k.i]+k.c,ctx.currentTime)}};
+bd.onpointermove=e=>{if(pts.has(e.pointerId)){pts.set(e.pointerId,pos(e));upd()}};
+bd.onpointerup=bd.onpointercancel=e=>{pts.delete(e.pointerId);upd()};
+function audio(){if(!ctx)ctx=new(window.AudioContext||window.webkitAudioContext)();if(ctx.state!=='running')ctx.resume()}
+function buf(m){if(bc[m])return bc[m];
+ const f=440*Math.pow(2,(m-69)/12),sr=ctx.sampleRate,N=Math.max(2,Math.round(sr/f)),L=Math.floor(sr*2),b=ctx.createBuffer(1,L,sr),d=b.getChannelData(0);
+ for(let i=0;i<N;i++)d[i]=Math.random()*2-1;
+ for(let i=N;i<L;i++)d[i]=(d[i-N]+d[i-N+1])*0.4975;
+ return bc[m]=b}
+function play(m,t){const s=ctx.createBufferSource(),g=ctx.createGain();s.buffer=buf(m);g.gain.value=0.18;s.connect(g);g.connect(ctx.destination);s.start(t)}
+$('pick').onpointerdown=e=>{e.preventDefault();audio();strum()};
+function strum(){
+ const p=calc(),f=CH[cur][0],t0=ctx.currentTime;let ok=true;
+ f.forEach((t,i)=>{
+  if(t>0&&p[i]!==t)ok=false;
+  if(t===0&&p[i]!==undefined)ok=false;
+  if(p[i]!==undefined||t>=0)play(T[i]+(p[i]!==undefined?p[i]:0),t0+i*0.03)});
+ const e=$('msg');e.textContent=ok?'◯ OK':'✕ もう一度';e.style.color=ok?'var(--ok)':'var(--ng)';
+ clearTimeout(mt);mt=setTimeout(()=>{e.textContent=''},1800);if(ok&&rnd){clearTimeout(nt);nt=setTimeout(nextChord,1500)}}
+window.onresize=draw;
+requestAnimationFrame(draw);
+</script></body></html>
