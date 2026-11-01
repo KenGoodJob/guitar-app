@@ -144,4 +144,5 @@ function showC(){
  const fr=CH[chord];
  $('cs').innerHTML=[5,4,3,2,1,0].map(i=>{const m=fr[i]<0,v=sacc[i]/n,good=v>=12;
   return`<div class="s"><span>${6-i}弦 ${m?'×(弾かない)':nm(tun[i]+fr[i])}</span><span style="color:${m?'var(--mut)':good?'var(--ok)':'var(--ng)'}">${m?'–':good?'鳴っている':'弱い/ミュート?'}</span></div>`}).join('')}
-</script></body></html>
+</script><div id="appver" style="position:fixed;top:4px;right:8px;z-index:99999;font:12px/1 ui-monospace,Menlo,monospace;color:#888;opacity:.8;pointer-events:none;user-select:none">v20261101191715</div>
+</body></html>
